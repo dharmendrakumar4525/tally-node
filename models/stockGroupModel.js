@@ -22,7 +22,7 @@ exports.upsertStockGroup = async (stockGroups) => {
   await createStockGroupTable();
 
   const sqlInsert = `
-    INSERT INTO stock_group (guid, alterid, name, parent)
+    INSERT INTO stock_group (alterid, name, parent)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       alterid = VALUES(alterid),

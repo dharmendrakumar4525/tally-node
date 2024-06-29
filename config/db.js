@@ -7,7 +7,7 @@ const connectionConfig = {
   password: 'place-your-password-here',
   database: 'tally_database_name',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 2000,
   queueLimit: 0,
   allowPublicKeyRetrieval: true
 };
