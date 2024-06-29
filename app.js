@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const initializeDatabase = require('./config/db');
 const { errorHandler } = require('./middleware/errorHandler');
 
+
 // Import routes for each table
 const ledgerGroupRoutes = require('./routes/ledgerGroupRoutes');
 const stockGroupRoutes = require('./routes/stockGroupRoutes');
@@ -15,7 +16,7 @@ const stockItemRoutes = require('./routes/stockItemRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '20mb' }));
 
 // Initialize database connection and start server
 initializeDatabase().then(() => {
