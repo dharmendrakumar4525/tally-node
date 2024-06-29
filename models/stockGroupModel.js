@@ -31,7 +31,6 @@ exports.upsertStockGroup = async (stockGroups) => {
   `;
 
   const values = stockGroups.map(group => [
-    group.guid,
     group.alterid || '',
     group.name || '',
     group.parent || ''
