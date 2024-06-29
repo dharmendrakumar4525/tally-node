@@ -4,7 +4,6 @@ async function createStockGroupTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS stock_group (
       guid INT AUTO_INCREMENT PRIMARY KEY,
-      uid VARCHAR(255) UNIQUE NOT NULL,
       alterid VARCHAR(255),
       name VARCHAR(255),
       parent VARCHAR(255)
@@ -23,7 +22,7 @@ exports.upsertStockGroup = async (stockGroups) => {
   await createStockGroupTable();
 
   const sqlInsert = `
-    INSERT INTO stock_group (uid, alterid, name, parent)
+    INSERT INTO stock_group (guid, alterid, name, parent)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       alterid = VALUES(alterid),
@@ -32,7 +31,7 @@ exports.upsertStockGroup = async (stockGroups) => {
   `;
 
   const values = stockGroups.map(group => [
-    group.uid,
+    group.guid,
     group.alterid || '',
     group.name || '',
     group.parent || ''

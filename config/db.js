@@ -5,7 +5,7 @@ const connectionConfig = {
   host: '18.207.143.104',
   user: 'root',
   password: 'place-your-password-here',
-  database: 'your_database_name',
+  database: 'tally_database_name',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
