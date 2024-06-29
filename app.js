@@ -16,7 +16,7 @@ const stockItemRoutes = require('./routes/stockItemRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 
 const app = express();
-app.use(bodyParser.json({ limit: '20mb' }));
+app.use(bodyParser.json({ limit: '75mb' }));
 
 // Initialize database connection and start server
 initializeDatabase().then(() => {
