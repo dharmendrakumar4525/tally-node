@@ -2,7 +2,7 @@ const mysql = require('mysql2/promise');
 
 // Database connection details
 const connectionConfig = {
-  host: '18.207.143.104',
+  host: '54.235.38.129',
   user: 'root',
   password: 'place-your-password-here',
   database: 'tally_database_name',

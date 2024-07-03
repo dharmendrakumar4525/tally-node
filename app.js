@@ -14,6 +14,7 @@ const ledgerRoutes = require('./routes/ledgerRoutes');
 const voucherTypeRoutes = require('./routes/voucherTypeRoutes');
 const stockItemRoutes = require('./routes/stockItemRoutes');
 const unitRoutes = require('./routes/unitRoutes');
+const voucherRoute = require('./routes/voucherRoute');
 
 const app = express();
 app.use(bodyParser.json({ limit: '75mb' }));
@@ -30,6 +31,7 @@ initializeDatabase().then(() => {
   app.use('/api/voucher-types', voucherTypeRoutes);
   app.use('/api/stock-items', stockItemRoutes);
   app.use('/api/units', unitRoutes);
+  app.use('/api/vouchers', voucherRoute);
 
   // Error handling middleware
   app.use(errorHandler);
