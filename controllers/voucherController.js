@@ -8,7 +8,7 @@ exports.upsertVouchers = async (req, res) => {
   }
 
   try {
-    const result = await Voucher.upsertVouchers(vouchers);
+    const result = await Voucher.upsertVoucher(vouchers);
     res.status(200).json({ message: 'Voucher data upserted successfully', result });
   } catch (err) {
     console.error('Error upserting data into voucher:', err);

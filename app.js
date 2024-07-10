@@ -3,7 +3,6 @@ const bodyParser = require('body-parser');
 const initializeDatabase = require('./config/db');
 const { errorHandler } = require('./middleware/errorHandler');
 
-
 // Import routes for each table
 const ledgerGroupRoutes = require('./routes/ledgerGroupRoutes');
 const stockGroupRoutes = require('./routes/stockGroupRoutes');

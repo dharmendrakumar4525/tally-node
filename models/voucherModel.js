@@ -1,7 +1,8 @@
-const moment = require('moment');
 const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
+const moment = require('moment');
 
-async function createVoucherTables() {
+async function createVoucherTable() {
   const createVoucherTableQuery = `
     CREATE TABLE IF NOT EXISTS voucher (
       guid VARCHAR(255) PRIMARY KEY,
@@ -16,11 +17,11 @@ async function createVoucherTables() {
       place_of_supply VARCHAR(255),
       is_invoice VARCHAR(10),
       narration TEXT
-    );
+    )
   `;
 
   const createInventoryEntriesTableQuery = `
-    CREATE TABLE IF NOT EXISTS inventory_entry (
+    CREATE TABLE IF NOT EXISTS inventory_entries (
       guid VARCHAR(255) PRIMARY KEY,
       voucher_guid VARCHAR(255),
       item VARCHAR(255),
@@ -33,22 +34,71 @@ async function createVoucherTables() {
       additional_amount DECIMAL(15, 2),
       tracking_number VARCHAR(255),
       order_number VARCHAR(255),
-      order_due_date DATE,
+      order_duedate DATE,
       FOREIGN KEY (voucher_guid) REFERENCES voucher(guid) ON DELETE CASCADE
-    );
+    )
+  `;
+
+  const createBatchAllocationsTableQuery = `
+    CREATE TABLE IF NOT EXISTS batch_allocations (
+      guid VARCHAR(255) PRIMARY KEY,
+      inventory_entry_guid VARCHAR(255),
+      item VARCHAR(255),
+      name VARCHAR(255),
+      godown VARCHAR(255),
+      quantity DECIMAL(15, 2),
+      amount DECIMAL(15, 2),
+      tracking_number VARCHAR(255),
+      FOREIGN KEY (inventory_entry_guid) REFERENCES inventory_entries(guid) ON DELETE CASCADE
+    )
+  `;
+
+  const createLedgerEntriesTableQuery = `
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      guid VARCHAR(255) PRIMARY KEY,
+      voucher_guid VARCHAR(255),
+      ledger_name VARCHAR(255),
+      amount DECIMAL(15, 2),
+      group_name VARCHAR(255),
+      is_deemed_positive VARCHAR(10),
+      is_party_ledger VARCHAR(10),
+      gst_rate VARCHAR(255),
+      hsn_code VARCHAR(255),
+      cess_rate VARCHAR(255),
+      FOREIGN KEY (voucher_guid) REFERENCES voucher(guid) ON DELETE CASCADE
+    )
+  `;
+
+  const createBillAllocationsTableQuery = `
+    CREATE TABLE IF NOT EXISTS bill_allocations (
+      guid VARCHAR(255) PRIMARY KEY,
+      ledger_entry_guid VARCHAR(255),
+      ledger VARCHAR(255),
+      billtype VARCHAR(255),
+      name VARCHAR(255),
+      amount DECIMAL(15, 2),
+      FOREIGN KEY (ledger_entry_guid) REFERENCES ledger_entries(guid) ON DELETE CASCADE
+    )
   `;
 
   try {
     const pool = await db();
     await pool.query(createVoucherTableQuery);
     await pool.query(createInventoryEntriesTableQuery);
+    await pool.query(createBatchAllocationsTableQuery);
+    await pool.query(createLedgerEntriesTableQuery);
+    await pool.query(createBillAllocationsTableQuery);
   } catch (err) {
-    throw new Error('Error creating tables: ' + err.message);
+    throw new Error('Error creating voucher tables: ' + err.message);
   }
 }
 
-exports.upsertVouchers = async (vouchers) => {
-  await createVoucherTables();
+function formatDate(dateString) {
+  return moment(dateString, 'D-MMM-YY').format('YYYY-MM-DD');
+}
+
+async function upsertVoucher(vouchers) {
+  await createVoucherTable();
 
   const sqlInsertVoucher = `
     INSERT INTO voucher (guid, alterid, voucher_number, date, reference_number, reference_date, party_name, voucher_type, Voucher_Total, place_of_supply, is_invoice, narration)
@@ -67,8 +117,8 @@ exports.upsertVouchers = async (vouchers) => {
       narration = VALUES(narration);
   `;
 
-  const sqlInsertInventoryEntry = `
-    INSERT INTO inventory_entry (guid, voucher_guid, item, quantity, rate, amount, discount_percent, godown, batch_name, additional_amount, tracking_number, order_number, order_due_date)
+  const sqlInsertInventoryEntries = `
+    INSERT INTO inventory_entries (guid, voucher_guid, item, quantity, rate, amount, discount_percent, godown, batch_name, additional_amount, tracking_number, order_number, order_duedate)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       item = VALUES(item),
@@ -81,55 +131,152 @@ exports.upsertVouchers = async (vouchers) => {
       additional_amount = VALUES(additional_amount),
       tracking_number = VALUES(tracking_number),
       order_number = VALUES(order_number),
-      order_due_date = VALUES(order_due_date);
+      order_duedate = VALUES(order_duedate);
+  `;
+
+  const sqlInsertBatchAllocations = `
+    INSERT INTO batch_allocations (guid, inventory_entry_guid, item, name, godown, quantity, amount, tracking_number)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      item = VALUES(item),
+      name = VALUES(name),
+      godown = VALUES(godown),
+      quantity = VALUES(quantity),
+      amount = VALUES(amount),
+      tracking_number = VALUES(tracking_number);
+  `;
+
+  const sqlInsertLedgerEntries = `
+    INSERT INTO ledger_entries (guid, voucher_guid, ledger_name, amount, group_name, is_deemed_positive, is_party_ledger, gst_rate, hsn_code, cess_rate)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      ledger_name = VALUES(ledger_name),
+      amount = VALUES(amount),
+      group_name = VALUES(group_name),
+      is_deemed_positive = VALUES(is_deemed_positive),
+      is_party_ledger = VALUES(is_party_ledger),
+      gst_rate = VALUES(gst_rate),
+      hsn_code = VALUES(hsn_code),
+      cess_rate = VALUES(cess_rate);
+  `;
+
+  const sqlInsertBillAllocations = `
+    INSERT INTO bill_allocations (guid, ledger_entry_guid, ledger, billtype, name, amount)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      ledger = VALUES(ledger),
+      billtype = VALUES(billtype),
+      name = VALUES(name),
+      amount = VALUES(amount);
   `;
 
   const voucherValues = vouchers.map(voucher => [
     voucher.guid,
-    voucher.alterid,
-    voucher.voucher_number,
-    moment(voucher.date, 'YYYY-MM-DD').format('YYYY-MM-DD'), // Format date correctly
+    voucher.alterid || 0,
+    voucher.voucher_number || '',
+    voucher.date ? formatDate(voucher.date) : null,
     voucher.reference_number || '',
-    voucher.reference_date ? moment(voucher.reference_date, 'YYYY-MM-DD').format('YYYY-MM-DD') : null,
-    voucher.party_name,
-    voucher.voucher_type,
-    parseFloat(voucher.Voucher_Total),
-    voucher.place_of_supply,
-    voucher.is_invoice,
+    voucher.reference_date ? formatDate(voucher.reference_date) : null,
+    voucher.party_name || '',
+    voucher.voucher_type || '',
+    parseFloat(voucher.Voucher_Total) || 0,
+    voucher.place_of_supply || '',
+    voucher.is_invoice || 'No',
     voucher.narration || ''
   ]);
 
-  const inventoryEntryValues = vouchers.reduce((acc, voucher) => {
+  const inventoryEntriesValues = [];
+  const batchAllocationsValues = [];
+  const ledgerEntriesValues = [];
+  const billAllocationsValues = [];
+
+  vouchers.forEach(voucher => {
     if (voucher.InventoryEntries && Array.isArray(voucher.InventoryEntries)) {
-      voucher.InventoryEntries.forEach(inventory => {
-        const orderDueDate = inventory.order_duedate ? moment(inventory.order_duedate, 'YYYY-MM-DD').format('YYYY-MM-DD') : null;
-        acc.push([
-          inventory.guid,
+      voucher.InventoryEntries.forEach(entry => {
+        const entryGuid = entry.guid || uuidv4();
+        inventoryEntriesValues.push([
+          entryGuid,
           voucher.guid,
-          inventory.item,
-          parseFloat(inventory.quantity),
-          parseFloat(inventory.Rate),
-          parseFloat(inventory.amount),
-          parseFloat(inventory.DiscountPercent) || 0,
-          inventory.godown,
-          inventory.BatchName,
-          parseFloat(inventory.additional_amount) || 0,
-          inventory.tracking_number,
-          inventory.order_number,
-          orderDueDate
+          entry.item || '',
+          parseFloat(entry.quantity) || 0,
+          parseFloat(entry.Rate) || 0,
+          parseFloat(entry.amount) || 0,
+          parseFloat(entry.DiscountPercent) || 0,
+          entry.godown || '',
+          entry.BatchName || '',
+          parseFloat(entry.additional_amount) || 0,
+          entry.tracking_number || '',
+          entry.order_number || '',
+          entry.order_duedate ? formatDate(entry.order_duedate) : null
         ]);
+
+        if (entry.BatchAllocations && Array.isArray(entry.BatchAllocations)) {
+          entry.BatchAllocations.forEach(batch => {
+            batchAllocationsValues.push([
+              batch.guid || uuidv4(),
+              entryGuid,
+              batch.item || '',
+              batch.name || '',
+              batch.godown || '',
+              parseFloat(batch.quantity) || 0,
+              parseFloat(batch.amount) || 0,
+              batch.tracking_number || ''
+            ]);
+          });
+        }
       });
     }
-    return acc;
-  }, []);
+
+    if (voucher.ledgerentries && Array.isArray(voucher.ledgerentries)) {
+      voucher.ledgerentries.forEach(entry => {
+        const ledgerEntryGuid = uuidv4();
+        ledgerEntriesValues.push([
+          ledgerEntryGuid,
+          voucher.guid,
+          entry.LedgerName || '',
+          parseFloat(entry.Amount) || 0,
+          entry.GroupName || '',
+          entry.IsDeemedPositive || 'No',
+          entry.IsPartyLedger || 'No',
+          entry.GSTRate || '',
+          entry.HSNCode || '',
+          entry.Cess_Rate || ''
+        ]);
+
+        if (entry.BillAllocations && Array.isArray(entry.BillAllocations)) {
+          entry.BillAllocations.forEach(bill => {
+            billAllocationsValues.push([
+              uuidv4(),
+              ledgerEntryGuid,
+              bill.ledger || '',
+              bill.billtype || '',
+              bill.name || '',
+              parseFloat(bill.amount) || 0
+            ]);
+          });
+        }
+      });
+    }
+  });
 
   try {
     const pool = await db();
     await pool.query(sqlInsertVoucher, [voucherValues]);
-    if (inventoryEntryValues.length > 0) {
-      await pool.query(sqlInsertInventoryEntry, [inventoryEntryValues]);
+    if (inventoryEntriesValues.length > 0) {
+      await pool.query(sqlInsertInventoryEntries, [inventoryEntriesValues]);
+    }
+    if (batchAllocationsValues.length > 0) {
+      await pool.query(sqlInsertBatchAllocations, [batchAllocationsValues]);
+    }
+    if (ledgerEntriesValues.length > 0) {
+      await pool.query(sqlInsertLedgerEntries, [ledgerEntriesValues]);
+    }
+    if (billAllocationsValues.length > 0) {
+      await pool.query(sqlInsertBillAllocations, [billAllocationsValues]);
     }
   } catch (err) {
     throw new Error('Error upserting voucher data: ' + err.message);
   }
 };
+
+module.exports = { upsertVoucher };
