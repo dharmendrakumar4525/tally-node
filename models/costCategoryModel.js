@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createCostCategoryTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS cost_category (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -23,9 +24,10 @@ exports.upsertCostCategory = async (costCategories) => {
   await createCostCategoryTable();
 
   const sqlInsert = `
-    INSERT INTO cost_category (guid, alterid, name, allocate_revenue, allocate_non_revenue)
+    INSERT INTO cost_category (companyid, guid, alterid, name, allocate_revenue, allocate_non_revenue)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       allocate_revenue = VALUES(allocate_revenue),
@@ -33,6 +35,7 @@ exports.upsertCostCategory = async (costCategories) => {
   `;
 
   const values = costCategories.map(category => [
+    category.companyid,
     category.guid,
     category.alterid || '',
     category.name || '',

@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createStockItemTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS stock_item (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -49,7 +50,7 @@ async function createStockItemTable() {
     await pool.query(createTableQuery);
     await pool.query(createBatchAllocationsTableQuery);
   } catch (err) {
-    throw new Error('Error creating stock item table: ' + err.message);
+    throw new Error('Error creating stock item and batch allocation tables: ' + err.message);
   }
 }
 
@@ -58,13 +59,14 @@ exports.upsertStockItem = async (stockItems) => {
 
   const sqlInsertStockItem = `
     INSERT INTO stock_item (
-      guid, alterid, name, parent, alias, part_number, Unit, AlternateUnit, Conversion,
+      companyid, guid, alterid, name, parent, alias, part_number, Unit, AlternateUnit, Conversion,
       opening_balance, opening_rate, opening_value, gst_type_of_supply, gst_hsn_code, gst_rate,
       gst_taxability, applicable_from_date, hsn_description, rate, is_rcm_applicable,
       nature_of_transaction, nature_of_goods, supply_type, taxability
     )
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -105,6 +107,7 @@ exports.upsertStockItem = async (stockItems) => {
   `;
 
   const stockItemValues = stockItems.map(item => [
+    item.companyid,
     item.guid,
     item.alterid || '',
     item.name || '',
@@ -121,7 +124,7 @@ exports.upsertStockItem = async (stockItems) => {
     item.gst_hsn_code || '',
     parseFloat(item.gst_rate) || 0,
     item.gst_taxability || '',
-    new Date(item['applicable_from date']),
+    item.applicable_from_date ? new Date(item.applicable_from_date) : null,
     item.hsn_description || '',
     parseFloat(item.rate) || 0,
     item.is_rcm_applicable || '',
@@ -142,7 +145,7 @@ exports.upsertStockItem = async (stockItems) => {
           parseFloat(batch.opening_rate) || 0,
           parseFloat(batch.opening_value) || 0,
           batch.godown || '',
-          batch['manufactured_on date'] ? new Date(batch['manufactured_on date']) : null
+          batch.manufactured_on ? new Date(batch.manufactured_on) : null
         ]);
       });
     }

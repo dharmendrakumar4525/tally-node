@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createUnitTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS unit (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -26,10 +27,11 @@ exports.upsertUnit = async (units) => {
 
   const sqlInsert = `
     INSERT INTO unit (
-      guid, alterid, name, formalname, is_simple_unit, additional_units, conversion
+      companyid, guid, alterid, name, formalname, is_simple_unit, additional_units, conversion
     )
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       formalname = VALUES(formalname),
@@ -39,6 +41,7 @@ exports.upsertUnit = async (units) => {
   `;
 
   const values = units.map(unit => [
+    unit.companyid,
     unit.guid,
     unit.alterid || '',
     unit.name || '',

@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createLedgerTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS ledger (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -57,9 +58,10 @@ exports.upsertLedger = async (ledgers) => {
   await createLedgerTable();
 
   const sqlInsertLedger = `
-    INSERT INTO ledger (guid, alterid, name, parent, alias, is_revenue, is_deemedpositive, opening_balance, description, mailing_name, mailing_address, mailing_state, mailing_country, mailing_pincode, email, it_pan, gstn, gst_registration_type, gst_supply_type, gst_duty_head, tax_rate, bank_account_holder, bank_account_number, bank_ifsc, bank_swift, bank_name, bank_branch)
+    INSERT INTO ledger (companyid, guid, alterid, name, parent, alias, is_revenue, is_deemedpositive, opening_balance, description, mailing_name, mailing_address, mailing_state, mailing_country, mailing_pincode, email, it_pan, gstn, gst_registration_type, gst_supply_type, gst_duty_head, tax_rate, bank_account_holder, bank_account_number, bank_ifsc, bank_swift, bank_name, bank_branch)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -97,6 +99,7 @@ exports.upsertLedger = async (ledgers) => {
   `;
 
   const ledgerValues = ledgers.map(ledger => [
+    ledger.companyid,
     ledger.guid,
     ledger.alterid || '',
     ledger.name || '',

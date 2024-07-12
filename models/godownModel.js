@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createGodownTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS godown (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -23,9 +24,10 @@ exports.upsertGodown = async (godowns) => {
   await createGodownTable();
 
   const sqlInsert = `
-    INSERT INTO godown (guid, alterid, name, parent, address)
+    INSERT INTO godown (companyid, guid, alterid, name, parent, address)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -33,6 +35,7 @@ exports.upsertGodown = async (godowns) => {
   `;
 
   const values = godowns.map(godown => [
+    godown.companyid,
     godown.guid,
     godown.alterid || '',
     godown.name || '',

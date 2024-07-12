@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createStockGroupTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS stock_group (
+      companyid VARCHAR(255) NOT NULL,
       guid INT AUTO_INCREMENT PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -22,15 +23,17 @@ exports.upsertStockGroup = async (stockGroups) => {
   await createStockGroupTable();
 
   const sqlInsert = `
-    INSERT INTO stock_group (alterid, name, parent)
+    INSERT INTO stock_group (companyid, alterid, name, parent)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent);
   `;
 
   const values = stockGroups.map(group => [
+    group.companyid,
     group.alterid || '',
     group.name || '',
     group.parent || ''

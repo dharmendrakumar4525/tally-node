@@ -5,6 +5,7 @@ const moment = require('moment');
 async function createVoucherTable() {
   const createVoucherTableQuery = `
     CREATE TABLE IF NOT EXISTS voucher (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid INT,
       voucher_number VARCHAR(255),
@@ -101,9 +102,10 @@ async function upsertVoucher(vouchers) {
   await createVoucherTable();
 
   const sqlInsertVoucher = `
-    INSERT INTO voucher (guid, alterid, voucher_number, date, reference_number, reference_date, party_name, voucher_type, Voucher_Total, place_of_supply, is_invoice, narration)
+    INSERT INTO voucher (companyid, guid, alterid, voucher_number, date, reference_number, reference_date, party_name, voucher_type, Voucher_Total, place_of_supply, is_invoice, narration)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       voucher_number = VALUES(voucher_number),
       date = VALUES(date),
@@ -171,6 +173,7 @@ async function upsertVoucher(vouchers) {
   `;
 
   const voucherValues = vouchers.map(voucher => [
+    voucher.companyid,
     voucher.guid,
     voucher.alterid || 0,
     voucher.voucher_number || '',

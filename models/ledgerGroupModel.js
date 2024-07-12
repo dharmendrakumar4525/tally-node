@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createLedgerGroupTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS ledger_group (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255) NOT NULL,
@@ -28,9 +29,10 @@ exports.upsertLedgerGroup = async (ledgerGroups) => {
   await createLedgerGroupTable();
 
   const sqlInsert = `
-    INSERT INTO ledger_group (guid, alterid, name, parent, primary_group, is_revenue, is_deemedpositive, is_reserved, affects_gross_profit, sort_position)
+    INSERT INTO ledger_group (companyid, guid, alterid, name, parent, primary_group, is_revenue, is_deemedpositive, is_reserved, affects_gross_profit, sort_position)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -43,6 +45,7 @@ exports.upsertLedgerGroup = async (ledgerGroups) => {
   `;
 
   const values = ledgerGroups.map(group => [
+    group.companyid,
     group.guid,
     group.alterid || '',
     group.name,

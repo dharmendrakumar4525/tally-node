@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createCostCenterTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS cost_center (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -23,9 +24,10 @@ exports.upsertCostCenter = async (costCenters) => {
   await createCostCenterTable();
 
   const sqlInsert = `
-    INSERT INTO cost_center (guid, alterid, name, parent, category)
+    INSERT INTO cost_center (companyid, guid, alterid, name, parent, category)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -33,6 +35,7 @@ exports.upsertCostCenter = async (costCenters) => {
   `;
 
   const values = costCenters.map(center => [
+    center.companyid,
     center.guid,
     center.alterid || '',
     center.name || '',

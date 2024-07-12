@@ -3,6 +3,7 @@ const db = require('../config/db');
 async function createVoucherTypeTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS voucher_type (
+      companyid VARCHAR(255) NOT NULL,
       guid VARCHAR(255) PRIMARY KEY,
       alterid VARCHAR(255),
       name VARCHAR(255),
@@ -25,9 +26,10 @@ exports.upsertVoucherType = async (voucherTypes) => {
   await createVoucherTypeTable();
 
   const sqlInsert = `
-    INSERT INTO voucher_type (guid, alterid, name, parent, numbering_method, is_deemedpositive, affects_stock)
+    INSERT INTO voucher_type (companyid, guid, alterid, name, parent, numbering_method, is_deemedpositive, affects_stock)
     VALUES ?
     ON DUPLICATE KEY UPDATE
+      companyid = VALUES(companyid),
       alterid = VALUES(alterid),
       name = VALUES(name),
       parent = VALUES(parent),
@@ -37,6 +39,7 @@ exports.upsertVoucherType = async (voucherTypes) => {
   `;
 
   const values = voucherTypes.map(type => [
+    type.companyid,
     type.guid,
     type.alterid || '',
     type.name || '',
