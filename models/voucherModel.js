@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
-const moment = require('moment');
 
 async function createVoucherTable() {
   const createVoucherTableQuery = `
@@ -94,10 +93,6 @@ async function createVoucherTable() {
   }
 }
 
-function formatDate(dateString) {
-  return moment(dateString, 'D-MMM-YY').format('YYYY-MM-DD');
-}
-
 async function upsertVoucher(vouchers) {
   await createVoucherTable();
 
@@ -177,9 +172,9 @@ async function upsertVoucher(vouchers) {
     voucher.guid,
     voucher.alterid || 0,
     voucher.voucher_number || '',
-    voucher.date ? formatDate(voucher.date) : null,
+    voucher.date || null,
     voucher.reference_number || '',
-    voucher.reference_date ? formatDate(voucher.reference_date) : null,
+    voucher.reference_date || null,
     voucher.party_name || '',
     voucher.voucher_type || '',
     parseFloat(voucher.Voucher_Total) || 0,
@@ -210,7 +205,7 @@ async function upsertVoucher(vouchers) {
           parseFloat(entry.additional_amount) || 0,
           entry.tracking_number || '',
           entry.order_number || '',
-          entry.order_duedate ? formatDate(entry.order_duedate) : null
+          entry.order_duedate || null
         ]);
 
         if (entry.BatchAllocations && Array.isArray(entry.BatchAllocations)) {
