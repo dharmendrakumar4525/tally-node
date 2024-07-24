@@ -1,5 +1,13 @@
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+
+// Function to generate a consistent GUID based on the content of the entry
+function generateConsistentGuid(entry) {
+  const hash = crypto.createHash('sha256');
+  hash.update(JSON.stringify(entry));
+  return hash.digest('hex');
+}
 
 async function createVoucherTable() {
   const createVoucherTableQuery = `
@@ -191,7 +199,21 @@ async function upsertVoucher(vouchers) {
   vouchers.forEach(voucher => {
     if (voucher.InventoryEntries && Array.isArray(voucher.InventoryEntries)) {
       voucher.InventoryEntries.forEach(entry => {
-        const entryGuid = entry.guid || uuidv4();
+        const entryGuid = generateConsistentGuid({
+          voucher_guid: voucher.guid,
+          item: entry.item,
+          quantity: entry.quantity,
+          rate: entry.Rate,
+          amount: entry.amount,
+          discount_percent: entry.DiscountPercent,
+          godown: entry.godown,
+          batch_name: entry.BatchName,
+          additional_amount: entry.additional_amount,
+          tracking_number: entry.tracking_number,
+          order_number: entry.order_number,
+          order_duedate: entry.order_duedate
+        });
+
         inventoryEntriesValues.push([
           entryGuid,
           voucher.guid,
@@ -210,8 +232,18 @@ async function upsertVoucher(vouchers) {
 
         if (entry.BatchAllocations && Array.isArray(entry.BatchAllocations)) {
           entry.BatchAllocations.forEach(batch => {
+            const batchGuid = generateConsistentGuid({
+              inventory_entry_guid: entryGuid,
+              item: batch.item,
+              name: batch.name,
+              godown: batch.godown,
+              quantity: batch.quantity,
+              amount: batch.amount,
+              tracking_number: batch.tracking_number
+            });
+
             batchAllocationsValues.push([
-              batch.guid || uuidv4(),
+              batchGuid,
               entryGuid,
               batch.item || '',
               batch.name || '',
@@ -227,7 +259,18 @@ async function upsertVoucher(vouchers) {
 
     if (voucher.ledgerentries && Array.isArray(voucher.ledgerentries)) {
       voucher.ledgerentries.forEach(entry => {
-        const ledgerEntryGuid = uuidv4();
+        const ledgerEntryGuid = generateConsistentGuid({
+          voucher_guid: voucher.guid,
+          ledger_name: entry.LedgerName,
+          amount: entry.Amount,
+          group_name: entry.GroupName,
+          is_deemed_positive: entry.IsDeemedPositive,
+          is_party_ledger: entry.IsPartyLedger,
+          gst_rate: entry.GSTRate,
+          hsn_code: entry.HSNCode,
+          cess_rate: entry.Cess_Rate
+        });
+
         ledgerEntriesValues.push([
           ledgerEntryGuid,
           voucher.guid,
@@ -243,8 +286,16 @@ async function upsertVoucher(vouchers) {
 
         if (entry.BillAllocations && Array.isArray(entry.BillAllocations)) {
           entry.BillAllocations.forEach(bill => {
+            const billGuid = generateConsistentGuid({
+              ledger_entry_guid: ledgerEntryGuid,
+              ledger: bill.ledger,
+              billtype: bill.billtype,
+              name: bill.name,
+              amount: bill.amount
+            });
+
             billAllocationsValues.push([
-              uuidv4(),
+              billGuid,
               ledgerEntryGuid,
               bill.ledger || '',
               bill.billtype || '',
@@ -275,6 +326,6 @@ async function upsertVoucher(vouchers) {
   } catch (err) {
     throw new Error('Error upserting voucher data: ' + err.message);
   }
-};
+}
 
 module.exports = { upsertVoucher };

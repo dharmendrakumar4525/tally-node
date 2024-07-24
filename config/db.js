@@ -2,13 +2,13 @@ const mysql = require('mysql2/promise');
 
 // Database connection details
 const connectionConfig = {
-  host: '52.23.174.242',
+  host: 'localhost',
   user: 'root',
-  password: 'place-your-password-here',
+  password: '',
   database: 'tally_database_name',
   connectionLimit: 2000,
   queueLimit: 0,
-  allowPublicKeyRetrieval: true,
+  //allowPublicKeyRetrieval: true,
 };
 
 // Function to initialize the database
