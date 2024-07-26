@@ -89,6 +89,27 @@ async function createVoucherTable() {
     )
   `;
 
+  const createCategoryAllocationTableQuery = `
+    CREATE TABLE IF NOT EXISTS category_allocation (
+      guid VARCHAR(255) PRIMARY KEY,
+      ledger_entry_guid VARCHAR(255),
+      Name VARCHAR(255),
+      Amount DECIMAL(15, 2),
+      FOREIGN KEY (ledger_entry_guid) REFERENCES ledger_entries(guid) ON DELETE CASCADE
+    )
+  `;
+
+  const createCostCentreAllocationsTableQuery = `
+    CREATE TABLE IF NOT EXISTS costcentre_allocations (
+      guid VARCHAR(255) PRIMARY KEY,
+      category_allocation_guid VARCHAR(255),
+      ledger VARCHAR(255),
+      costcentre VARCHAR(255),
+      Amount DECIMAL(15, 2),
+      FOREIGN KEY (category_allocation_guid) REFERENCES category_allocation(guid) ON DELETE CASCADE
+    )
+  `;
+
   try {
     const pool = await db();
     await pool.query(createVoucherTableQuery);
@@ -96,6 +117,8 @@ async function createVoucherTable() {
     await pool.query(createBatchAllocationsTableQuery);
     await pool.query(createLedgerEntriesTableQuery);
     await pool.query(createBillAllocationsTableQuery);
+    await pool.query(createCategoryAllocationTableQuery); // Added execution for category_allocation
+    await pool.query(createCostCentreAllocationsTableQuery); // Added execution for costcentre_allocations
   } catch (err) {
     throw new Error('Error creating voucher tables: ' + err.message);
   }
@@ -175,19 +198,36 @@ async function upsertVoucher(vouchers) {
       amount = VALUES(amount);
   `;
 
+  const sqlInsertCategoryAllocation = `
+    INSERT INTO category_allocation (guid, ledger_entry_guid, Name, Amount)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      Name = VALUES(Name),
+      Amount = VALUES(Amount);
+  `;
+
+  const sqlInsertCostCentreAllocations = `
+    INSERT INTO costcentre_allocations (guid, category_allocation_guid, ledger, costcentre, Amount)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE
+      ledger = VALUES(ledger),
+      costcentre = VALUES(costcentre),
+      Amount = VALUES(Amount);
+  `;
+
   const voucherValues = vouchers.map(voucher => [
     voucher.companyid,
     voucher.guid,
-    voucher.alterid || 0,
-    voucher.voucher_number || '',
-    voucher.date || null,
+    voucher.alterid,
+    voucher.voucher_number,
+    voucher.date,
     voucher.reference_number || '',
     voucher.reference_date || null,
     voucher.party_name || '',
     voucher.voucher_type || '',
     parseFloat(voucher.Voucher_Total) || 0,
     voucher.place_of_supply || '',
-    voucher.is_invoice || 'No',
+    voucher.is_invoice || '',
     voucher.narration || ''
   ]);
 
@@ -195,6 +235,8 @@ async function upsertVoucher(vouchers) {
   const batchAllocationsValues = [];
   const ledgerEntriesValues = [];
   const billAllocationsValues = [];
+  const CategoryAllocationValues = [];
+  const CostCentreAllocationsValues = [];
 
   vouchers.forEach(voucher => {
     if (voucher.InventoryEntries && Array.isArray(voucher.InventoryEntries)) {
@@ -304,6 +346,42 @@ async function upsertVoucher(vouchers) {
             ]);
           });
         }
+
+        if (entry.CategoryAllocation && Array.isArray(entry.CategoryAllocation)) {
+          entry.CategoryAllocation.forEach(category => {
+            const categoryGuid = generateConsistentGuid({
+              ledger_entry_guid: ledgerEntryGuid,
+              Name: category.Name,
+              Amount: category.Amount
+            });
+
+            CategoryAllocationValues.push([
+              categoryGuid,
+              ledgerEntryGuid,
+              category.Name || '',
+              parseFloat(category.Amount) || 0
+            ]);
+
+            if (category.CostCentreAllocations && Array.isArray(category.CostCentreAllocations)) {
+              category.CostCentreAllocations.forEach(costCentre => {
+                const costCentreGuid = generateConsistentGuid({
+                  category_allocation_guid: categoryGuid,
+                  ledger: costCentre.ledger,
+                  costcentre: costCentre.costcentre,
+                  Amount: costCentre.Amount
+                });
+
+                CostCentreAllocationsValues.push([
+                  costCentreGuid,
+                  categoryGuid,
+                  costCentre.ledger || '',
+                  costCentre.costcentre || '',
+                  parseFloat(costCentre.Amount) || 0
+                ]);
+              });
+            }
+          });
+        }
       });
     }
   });
@@ -322,6 +400,12 @@ async function upsertVoucher(vouchers) {
     }
     if (billAllocationsValues.length > 0) {
       await pool.query(sqlInsertBillAllocations, [billAllocationsValues]);
+    }
+    if (CategoryAllocationValues.length > 0) {
+      await pool.query(sqlInsertCategoryAllocation, [CategoryAllocationValues]);
+    }
+    if (CostCentreAllocationsValues.length > 0) {
+      await pool.query(sqlInsertCostCentreAllocations, [CostCentreAllocationsValues]);
     }
   } catch (err) {
     throw new Error('Error upserting voucher data: ' + err.message);
