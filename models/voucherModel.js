@@ -24,7 +24,8 @@ async function createVoucherTable() {
       Voucher_Total DECIMAL(15, 2),
       place_of_supply VARCHAR(255),
       is_invoice VARCHAR(10),
-      narration TEXT
+      narration TEXT,
+      masterid VARCHAR(255)
     )
   `;
 
@@ -37,6 +38,7 @@ async function createVoucherTable() {
       rate DECIMAL(15, 2),
       amount DECIMAL(15, 2),
       discount_percent DECIMAL(5, 2),
+      discount_amount DECIMAL(15, 2), -- Added missing column
       godown VARCHAR(255),
       batch_name VARCHAR(255),
       additional_amount DECIMAL(15, 2),
@@ -73,6 +75,16 @@ async function createVoucherTable() {
       gst_rate VARCHAR(255),
       hsn_code VARCHAR(255),
       cess_rate VARCHAR(255),
+      masterid VARCHAR(255), -- Added missing column
+      LedgerCode VARCHAR(255), -- Added missing column
+      OpeningBalance DECIMAL(15, 2), -- Added missing column
+      OpeningBalanceType VARCHAR(255), -- Added missing column
+      NatureOfGroup VARCHAR(255), -- Added missing column
+      Parent_1 VARCHAR(255), -- Added missing column
+      Parent_2 VARCHAR(255), -- Added missing column
+      Parent_3 VARCHAR(255), -- Added missing column
+      Parent_4 VARCHAR(255), -- Added missing column
+      Parent_5 VARCHAR(255), -- Added missing column
       FOREIGN KEY (voucher_guid) REFERENCES voucher(guid) ON DELETE CASCADE
     )
   `;
@@ -117,8 +129,8 @@ async function createVoucherTable() {
     await pool.query(createBatchAllocationsTableQuery);
     await pool.query(createLedgerEntriesTableQuery);
     await pool.query(createBillAllocationsTableQuery);
-    await pool.query(createCategoryAllocationTableQuery); // Added execution for category_allocation
-    await pool.query(createCostCentreAllocationsTableQuery); // Added execution for costcentre_allocations
+    await pool.query(createCategoryAllocationTableQuery);
+    await pool.query(createCostCentreAllocationsTableQuery);
   } catch (err) {
     throw new Error('Error creating voucher tables: ' + err.message);
   }
@@ -128,7 +140,7 @@ async function upsertVoucher(vouchers) {
   await createVoucherTable();
 
   const sqlInsertVoucher = `
-    INSERT INTO voucher (companyid, guid, alterid, voucher_number, date, reference_number, reference_date, party_name, voucher_type, Voucher_Total, place_of_supply, is_invoice, narration)
+    INSERT INTO voucher (companyid, guid, alterid, voucher_number, date, reference_number, reference_date, party_name, voucher_type, Voucher_Total, place_of_supply, is_invoice, narration, masterid)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       companyid = VALUES(companyid),
@@ -142,11 +154,12 @@ async function upsertVoucher(vouchers) {
       Voucher_Total = VALUES(Voucher_Total),
       place_of_supply = VALUES(place_of_supply),
       is_invoice = VALUES(is_invoice),
-      narration = VALUES(narration);
+      narration = VALUES(narration),
+      masterid = VALUES(masterid);
   `;
 
   const sqlInsertInventoryEntries = `
-    INSERT INTO inventory_entries (guid, voucher_guid, item, quantity, rate, amount, discount_percent, godown, batch_name, additional_amount, tracking_number, order_number, order_duedate)
+    INSERT INTO inventory_entries (guid, voucher_guid, item, quantity, rate, amount, discount_percent, discount_amount, godown, batch_name, additional_amount, tracking_number, order_number, order_duedate)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       item = VALUES(item),
@@ -154,6 +167,7 @@ async function upsertVoucher(vouchers) {
       rate = VALUES(rate),
       amount = VALUES(amount),
       discount_percent = VALUES(discount_percent),
+      discount_amount = VALUES(discount_amount),
       godown = VALUES(godown),
       batch_name = VALUES(batch_name),
       additional_amount = VALUES(additional_amount),
@@ -175,7 +189,7 @@ async function upsertVoucher(vouchers) {
   `;
 
   const sqlInsertLedgerEntries = `
-    INSERT INTO ledger_entries (guid, voucher_guid, ledger_name, amount, group_name, is_deemed_positive, is_party_ledger, gst_rate, hsn_code, cess_rate)
+    INSERT INTO ledger_entries (guid, voucher_guid, ledger_name, amount, group_name, is_deemed_positive, is_party_ledger, gst_rate, hsn_code, cess_rate, masterid, LedgerCode, OpeningBalance, OpeningBalanceType, NatureOfGroup, Parent_1, Parent_2, Parent_3, Parent_4, Parent_5)
     VALUES ?
     ON DUPLICATE KEY UPDATE
       ledger_name = VALUES(ledger_name),
@@ -185,7 +199,17 @@ async function upsertVoucher(vouchers) {
       is_party_ledger = VALUES(is_party_ledger),
       gst_rate = VALUES(gst_rate),
       hsn_code = VALUES(hsn_code),
-      cess_rate = VALUES(cess_rate);
+      cess_rate = VALUES(cess_rate),
+      masterid = VALUES(masterid),
+      LedgerCode = VALUES(LedgerCode),
+      OpeningBalance = VALUES(OpeningBalance),
+      OpeningBalanceType = VALUES(OpeningBalanceType),
+      NatureOfGroup = VALUES(NatureOfGroup),
+      Parent_1 = VALUES(Parent_1),
+      Parent_2 = VALUES(Parent_2),
+      Parent_3 = VALUES(Parent_3),
+      Parent_4 = VALUES(Parent_4),
+      Parent_5 = VALUES(Parent_5);
   `;
 
   const sqlInsertBillAllocations = `
@@ -228,7 +252,8 @@ async function upsertVoucher(vouchers) {
     parseFloat(voucher.Voucher_Total) || 0,
     voucher.place_of_supply || '',
     voucher.is_invoice || '',
-    voucher.narration || ''
+    voucher.narration || '',
+    voucher.masterid || ''
   ]);
 
   const inventoryEntriesValues = [];
@@ -264,6 +289,7 @@ async function upsertVoucher(vouchers) {
           parseFloat(entry.Rate) || 0,
           parseFloat(entry.amount) || 0,
           parseFloat(entry.DiscountPercent) || 0,
+          parseFloat(entry.discount_amount) || 0,
           entry.godown || '',
           entry.BatchName || '',
           parseFloat(entry.additional_amount) || 0,
@@ -323,7 +349,17 @@ async function upsertVoucher(vouchers) {
           entry.IsPartyLedger || 'No',
           entry.GSTRate || '',
           entry.HSNCode || '',
-          entry.Cess_Rate || ''
+          entry.Cess_Rate || '',
+          entry.masterid || '',
+          entry.LedgerCode || '',
+          parseFloat(entry.OpeningBalance) || 0,
+          entry.OpeningBalanceType || '',
+          entry.NatureOfGroup || '',
+          entry.Parent_1 || '',
+          entry.Parent_2 || '',
+          entry.Parent_3 || '',
+          entry.Parent_4 || '',
+          entry.Parent_5 || ''
         ]);
 
         if (entry.BillAllocations && Array.isArray(entry.BillAllocations)) {
